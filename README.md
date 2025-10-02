@@ -1,123 +1,224 @@
+Aqui está a documentação atualizada para incluir ambos os scripts:
+
+---
+
+# Gerenciador de Tags para Obsidian - Documentação Completa
+
 ## Descrição Geral
-Este script Python foi desenvolvido para gerenciar automaticamente tags YAML em arquivos Markdown do Obsidian, baseando-se na estrutura de pastas onde os arquivos estão localizados.
+Esta coleção de scripts Python foi desenvolvida para gerenciar automaticamente tags YAML em arquivos Markdown do Obsidian. Inclui funcionalidades para adicionar tags baseadas na estrutura de pastas e remover tags específicas conforme necessário.
 
-## Funcionalidades Principais
-1. **Gerenciamento Automático de Tags**
-   - Adiciona tags baseadas nos dois primeiros níveis de pastas
-   - Preserva tags personalizadas existentes
-   - Remove apenas tags relacionadas a pastas quando arquivos são movidos
+## Scripts Disponíveis
 
-2. **Processamento Inteligente**
-   - Ignora a pasta `.obsidian` e seu conteúdo
-   - Processa apenas arquivos Markdown (.md)
-   - Mantém formatação original dos arquivos
-   - Evita linhas em branco extras após o frontmatter YAML
+### 1. **Tag_Handler_Obsidian.py** - Gerenciador Principal de Tags
+Script principal que adiciona e atualiza tags baseadas na estrutura de pastas com tags aninhadas.
 
-3. **Relatório de Alterações**
-   - Mostra quais arquivos foram modificados
-   - Lista tags adicionadas e removidas
-   - Fornece um resumo final com total de arquivos processados
+### 2. **Remove_Folder_Tags.py** - Removedor de Tags de Pastas
+Script utilitário que remove apenas tags que correspondem a nomes de pastas existentes.
+
+---
+
+## Funcionalidades por Script
+
+### Tag_Handler_Obsidian.py
+1. **Tags Aninhadas Automáticas**
+   - Cria tags com caminho completo das pastas (ex: `Sora/AI/Prompts/imagens`)
+   - Atualiza automaticamente quando arquivos são movidos
+   - Remove tags de localização antigas
+
+2. **Preservação Inteligente**
+   - Mantém todas as tags personalizadas existentes
+   - Preserva outras propriedades YAML (título, autor, etc.)
+   - Detecta e substitui apenas tags de caminho
+
+3. **Processamento Completo**
+   - Processa todos os níveis de pasta (não limitado a 2)
+   - Execução automática sem confirmação
+   - Relatório detalhado de alterações
+
+### Remove_Folder_Tags.py
+1. **Remoção Seletiva**
+   - Remove apenas tags que coincidem com nomes de pastas
+   - Preserva tags personalizadas que não são nomes de pastas
+   - Solicita confirmação antes da execução
+
+2. **Processamento Seguro**
+   - Identifica automaticamente todas as pastas
+   - Remove tags correspondentes de forma seletiva
+   - Mantém outras propriedades YAML intactas
+
+---
 
 ## Como Usar
 
-1. **Instalação**
-   - Salve o script como `Tag_Handler_Obsidian.py`
-   - Coloque o arquivo na pasta raiz onde estão suas notas do Obsidian
+### Instalação
+1. Salve ambos os scripts na pasta raiz das suas notas do Obsidian
+2. Certifique-se de ter Python 3 e a biblioteca `pyyaml` instalada
 
-2. **Execução**
-   - Execute o script usando Python 3
-   - Comando: `python Tag_Handler_Obsidian.py`
+### Execução
 
-3. **Exemplo de Estrutura de Pastas Suportada**
+**Para adicionar/atualizar tags aninhadas:**
+```bash
+python Tag_Handler_Obsidian.py
 ```
-📁 Pasta_Raiz (onde está o script)
- ├── 📁 Pessoal
- │    ├── 📁 Médico
- │    │    └── 📄 consulta.md
- │    └── 📁 Financeiro
- │         └── 📄 orcamento.md
- └── 📁 Trabalho
-      └── 📁 Projetos
-           └── 📄 projeto1.md
+
+**Para remover tags de pastas específicas:**
+```bash
+python Remove_Folder_Tags.py
 ```
+
+---
 
 ## Exemplos de Uso
 
-### Exemplo 1: Arquivo Novo
-**Localização**: `Pessoal/Médico/consulta.md`
-**Resultado**:
+### Exemplo 1: Tags Aninhadas (Tag_Handler_Obsidian.py)
+**Estrutura de Pastas:**
+```
+📁 Pasta_Raiz
+ ├── 📁 Sora
+ │    └── 📁 AI
+ │         └── 📁 Prompts
+ │              └── 📄 imagens.md
+ └── 📁 Trabalho
+      └── 📁 Projetos
+           └── 📄 cliente1.md
+```
+
+**Resultado para `Sora/AI/Prompts/imagens.md`:**
 ```yaml
 ---
 tags:
-  - Pessoal
-  - Médico
+  - Sora/AI/Prompts
+  - importante  # tag personalizada preservada
 ---
 ```
 
-### Exemplo 2: Arquivo com Tags Existentes
-**Antes** (`Pessoal/Médico/consulta.md`):
+### Exemplo 2: Remoção Seletiva (Remove_Folder_Tags.py)
+**Antes** (com pastas: Sora, AI, Trabalho):
 ```yaml
 ---
 tags:
-  - Remédios
-  - Pessoal
-  - Médico
+  - Sora
+  - importante
+  - AI
+  - revisão
 ---
 ```
 
-**Depois de Mover para** `Pessoal/arquivo.md`:
+**Depois:**
 ```yaml
 ---
 tags:
-  - Remédios
-  - Pessoal
+  - importante
+  - revisão
 ---
 ```
 
-## Detalhamento Técnico do Funcionamento
+### Exemplo 3: Movimentação de Arquivo
+**Arquivo movido de** `Sora/AI/arquivo.md` **para** `Trabalho/Projetos/arquivo.md`:
 
-1. **Identificação de Tags de Pasta**
-   - Escaneia a estrutura de diretórios
-   - Identifica todos os nomes de pastas possíveis
-   - Converte espaços em underscores nos nomes das tags
+**Antes:**
+```yaml
+---
+tags:
+  - Sora/AI
+  - importante
+---
+```
 
-2. **Processamento de Arquivos**
-   - Lê o conteúdo do arquivo
-   - Identifica frontmatter YAML existente
-   - Preserva tags personalizadas
-   - Atualiza tags baseadas na localização atual
+**Depois:**
+```yaml
+---
+tags:
+  - Trabalho/Projetos
+  - importante
+---
+```
 
-3. **Gerenciamento de Conteúdo**
-   - Mantém formatação original
-   - Evita duplicação de tags
-   - Remove espaços em branco desnecessários
+---
 
-4. **Sistema de Relatório**
-   - Registra alterações por arquivo
-   - Mostra tags adicionadas/removidas
-   - Fornece estatísticas de processamento
+## Fluxo de Trabalho Recomendado
 
-## Limitações e Observações
-- Processa apenas os dois primeiros níveis de pastas
-- Funciona apenas com arquivos Markdown
-- Requer Python 3
-- Necessita da biblioteca `pyyaml`
+### Cenário 1: Limpeza Inicial
+1. Execute `Remove_Folder_Tags.py` para remover tags antigas de pastas
+2. Execute `Tag_Handler_Obsidian.py` para adicionar tags aninhadas atualizadas
 
-## Recomendações de Uso
-1. Faça backup antes de executar o script
-2. Verifique os relatórios após a execução
-3. Use nomes de pasta sem caracteres especiais
-4. Mantenha o script na pasta raiz das suas notas
+### Cenário 2: Manutenção Regular
+- Execute apenas `Tag_Handler_Obsidian.py` periodicamente
+- O script detecta e corrige automaticamente tags desatualizadas
 
-## Mensagens de Erro Comuns
-- "Error reading file": Problema ao ler o arquivo
-- "Error parsing YAML": Frontmatter YAML mal formatado
-- "Error writing to file": Problema ao salvar alterações
+### Cenário 3: Reorganização de Pastas
+1. Reorganize suas pastas conforme necessário
+2. Execute `Tag_Handler_Obsidian.py`
+3. Tags serão automaticamente atualizadas para refletir nova estrutura
+
+---
+
+## Detalhamento Técnico
+
+### Tag_Handler_Obsidian.py
+- **Detecção de Tags de Caminho**: Identifica tags que representam estrutura de pastas
+- **Substituição Inteligente**: Remove apenas tags de caminho antigas
+- **Geração de Tags Aninhadas**: Usa "/" como separador para estrutura completa
+- **Processamento em Tempo Real**: Atualiza baseado na localização atual do arquivo
+
+### Remove_Folder_Tags.py
+- **Mapeamento de Pastas**: Escaneia toda estrutura de diretórios
+- **Comparação Exata**: Remove tags que coincidem exatamente com nomes de pastas
+- **Preservação de Contexto**: Mantém tags que não representam pastas
+
+---
+
+## Configurações e Personalizações
+
+### Modificações Comuns
+
+**Para ignorar pastas específicas:**
+```python
+# Adicione na lista de exclusões
+if item_name in ['.obsidian', 'Templates', 'Archive']:
+    continue
+```
+
+**Para alterar formato de tags:**
+```python
+# Altere o separador de "/" para outro caractere
+nested_tag = '-'.join(clean_parts)  # Ex: Sora-AI-Prompts
+```
+
+---
+
+## Limitações e Considerações
+
+### Tag_Handler_Obsidian.py
+- Executa automaticamente sem confirmação
+- Substitui espaços por underscores nos nomes de pastas
+- Processa recursivamente todos os subdiretórios
+
+### Remove_Folder_Tags.py
+- Solicita confirmação antes da execução
+- Remove apenas correspondências exatas
+- Operação irreversível
+
+---
+
+## Troubleshooting
+
+### Problemas Comuns
+1. **"Error parsing YAML"**: Verifique formatação do frontmatter
+2. **Tags não atualizadas**: Certifique-se que o arquivo está na localização correta
+3. **Permissões negadas**: Execute com permissões adequadas de escrita
+
+### Recomendações de Segurança
+- Faça backup antes de executar os scripts
+- Teste em uma pasta pequena primeiro
+- Verifique os relatórios após execução
+
+---
 
 ## Requisitos Técnicos
 - Python 3.x
-- Biblioteca pyyaml
-- Sistema de arquivos com permissões de leitura/escrita
+- Biblioteca pyyaml (`pip install pyyaml`)
+- Permissões de leitura/escrita nos arquivos
+- Estrutura de pastas organizada
 
-## Suporte
-Este script é de código aberto e pode ser modificado conforme necessário para atender requisitos específicos.
+---

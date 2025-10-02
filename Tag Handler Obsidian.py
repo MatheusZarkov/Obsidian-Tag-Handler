@@ -2,18 +2,23 @@ import os
 import yaml
 import re
 
-def get_path_tags(file_path, script_directory):
+def get_nested_path_tag(file_path, script_directory):
+    """Generate a single nested tag from the full folder path"""
     # Get the relative path from the script directory
     rel_path = os.path.relpath(file_path, script_directory)
     # Split the path and remove the file name
     path_parts = os.path.dirname(rel_path).split(os.sep)
-    # Only keep the first two parts (parent folder and first subfolder)
-    tags = [part.replace(' ', '_') for part in path_parts[:2] if part]
-    return tags
+    # Filter out empty parts and replace spaces with underscores
+    clean_parts = [part.replace(' ', '_') for part in path_parts if part and part != '.']
+    
+    if clean_parts:
+        # Return single nested tag with all folder levels
+        return '/'.join(clean_parts)
+    return None
 
-def get_all_possible_folder_tags(script_directory):
-    """Get all possible folder tags from the directory structure"""
-    folder_tags = set()
+def get_all_possible_path_tags(script_directory):
+    """Get all possible path tags from the directory structure"""
+    path_tags = set()
     for root, dirs, _ in os.walk(script_directory):
         # Skip .obsidian folder
         if '.obsidian' in dirs:
@@ -25,13 +30,20 @@ def get_all_possible_folder_tags(script_directory):
             continue
             
         path_parts = rel_path.split(os.sep)
-        # Add only first two levels of folders
-        for part in path_parts[:2]:
-            folder_tags.add(part.replace(' ', '_'))
+        clean_parts = [part.replace(' ', '_') for part in path_parts if part]
+        
+        if clean_parts:
+            # Add the full nested path as a single tag
+            nested_tag = '/'.join(clean_parts)
+            path_tags.add(nested_tag)
     
-    return folder_tags
+    return path_tags
 
-def process_file(file_path, script_directory, folder_tags):
+def is_path_tag(tag, all_path_tags):
+    """Check if a tag represents a folder path structure"""
+    return tag in all_path_tags
+
+def process_file(file_path, script_directory, all_path_tags):
     changes = []  # List to store changes
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
@@ -44,8 +56,8 @@ def process_file(file_path, script_directory, folder_tags):
     yaml_pattern = r'^---\n(.*?)\n---'
     yaml_match = re.match(yaml_pattern, content, re.DOTALL)
     
-    # Get current path tags
-    current_path_tags = get_path_tags(file_path, script_directory)
+    # Get current path tag
+    current_path_tag = get_nested_path_tag(file_path, script_directory)
     
     if yaml_match:
         # If YAML front matter exists
@@ -61,25 +73,39 @@ def process_file(file_path, script_directory, folder_tags):
             elif existing_tags is None:
                 existing_tags = []
             
-            # Remove old folder tags but keep custom tags
-            custom_tags = [tag for tag in existing_tags if tag not in folder_tags]
+            # Separate custom tags from old path tags
+            custom_tags = []
+            old_path_tags = []
             
-            # Combine custom tags with new path tags
-            all_tags = list(set(custom_tags + current_path_tags))
-            all_tags.sort()  # Optional: sort tags alphabetically
+            for tag in existing_tags:
+                if is_path_tag(tag, all_path_tags):
+                    old_path_tags.append(tag)
+                else:
+                    custom_tags.append(tag)
+            
+            # Create new tag list: custom tags + current path tag
+            new_tags = custom_tags.copy()
+            if current_path_tag:
+                new_tags.append(current_path_tag)
+            
+            # Remove duplicates and sort
+            new_tags = list(set(new_tags))
+            new_tags.sort()
             
             # Track changes
-            added_tags = [tag for tag in all_tags if tag not in existing_tags]
-            removed_tags = [tag for tag in existing_tags if tag not in all_tags]
+            if current_path_tag and current_path_tag not in existing_tags:
+                changes.append(f"Added path tag: {current_path_tag}")
             
-            if added_tags:
-                changes.append(f"Added tags: {', '.join(added_tags)}")
-            if removed_tags:
-                changes.append(f"Removed tags: {', '.join(removed_tags)}")
+            if old_path_tags:
+                # Check if the old path tags are different from current
+                if not current_path_tag or current_path_tag not in old_path_tags:
+                    changes.append(f"Removed old path tags: {', '.join(old_path_tags)}")
             
-            # Create new YAML front matter
-            new_yaml = {'tags': all_tags}
-            new_yaml_string = yaml.dump(new_yaml, allow_unicode=True, sort_keys=False)
+            # Update YAML with all existing properties
+            existing_yaml['tags'] = new_tags
+            
+            # Preserve the order of existing YAML properties
+            new_yaml_string = yaml.dump(existing_yaml, allow_unicode=True, sort_keys=False)
             
             # Get the content after front matter and clean up extra newlines
             remaining_content = content[yaml_match.end():].lstrip()
@@ -92,11 +118,15 @@ def process_file(file_path, script_directory, folder_tags):
             return
     else:
         # If no YAML front matter exists, create new one
-        new_yaml = {'tags': current_path_tags}
-        new_yaml_string = yaml.dump(new_yaml, allow_unicode=True, sort_keys=False)
-        content = content.lstrip()
-        new_content = f"---\n{new_yaml_string}---\n{content}"
-        changes.append(f"Added initial tags: {', '.join(current_path_tags)}")
+        if current_path_tag:
+            new_yaml = {'tags': [current_path_tag]}
+            new_yaml_string = yaml.dump(new_yaml, allow_unicode=True, sort_keys=False)
+            content = content.lstrip()
+            new_content = f"---\n{new_yaml_string}---\n{content}"
+            changes.append(f"Added initial path tag: {current_path_tag}")
+        else:
+            # If no path tag needed, don't modify the file
+            return
 
     # Only write to file if there were changes
     if changes:
@@ -115,38 +145,25 @@ def process_file(file_path, script_directory, folder_tags):
 
 
 def process_directory(base_dir):
-    # Get all possible folder tags first
-    folder_tags = get_all_possible_folder_tags(base_dir)
+    # Get all possible path tags first
+    all_path_tags = get_all_possible_path_tags(base_dir)
     
     files_processed = 0
-    files_changed = 0
     
-    # Process only the immediate subdirectories in the base directory
-    for item in os.listdir(base_dir):
-        full_path = os.path.join(base_dir, item)
+    # Process all markdown files in the directory tree
+    for root, dirs, files in os.walk(base_dir):
+        # Skip .obsidian folder
+        if '.obsidian' in dirs:
+            dirs.remove('.obsidian')
         
-        # Skip the script file itself and the .obsidian folder
-        if item == '.obsidian' or item.endswith('.py'):
-            continue
-            
-        if os.path.isdir(full_path):
-            # Walk through each subdirectory
-            for root, dirs, files in os.walk(full_path):
-                # Remove .obsidian folder from dirs if present
-                if '.obsidian' in dirs:
-                    dirs.remove('.obsidian')
+        for file in files:
+            if file.endswith('.md'):
+                files_processed += 1
+                file_path = os.path.join(root, file)
+                process_file(file_path, base_dir, all_path_tags)
                 
-                for file in files:
-                    if file.endswith('.md'):
-                        files_processed += 1
-                        file_path = os.path.join(root, file)
-                        process_file(file_path, base_dir, folder_tags)
-                        files_changed += 1
-
-    # Print summary
     print(f"\nSummary:")
     print(f"Files processed: {files_processed}")
-    print(f"Files changed: {files_changed}")
 
 if __name__ == "__main__":
     # Get the directory where the script is located
